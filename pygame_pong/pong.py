@@ -107,14 +107,14 @@ while game_ongoing:
     
     #checks ball position at screen edges
     #right and left bound
-    if ball.rect.x >= 780:   
+    if ball.rect.x >= 770:   
         p1Score +=1
         goalSo.play()
         ball.rect.x = 400
         ball.rect.y = 200
         ball.velocity = [randint(-8, -4), randint(-8, 8)]
         
-    if ball.rect.x <= 2:        
+    if ball.rect.x <= 10:        
         p2Score +=1
         goalSo.play()
         ball.rect.x = 400
