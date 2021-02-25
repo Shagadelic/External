@@ -6,12 +6,12 @@ Has some clipping issues with the collisions.
 p1:  
 move up 	: w  
 move down	: s  
-double spped	: q  
+double speed	: q  
 
 p2:  
 move up 	: o  
 move down	: l  
-double spped	: p  
+double speed	: p  
 
 #Exit  
 stop with x
