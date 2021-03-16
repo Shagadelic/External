@@ -7,7 +7,7 @@ Created on Mon Feb 22 19:14:17 2021
 
 Weather: sunny
 
-Groovyness: 4/10
+Groove: 4/10
 """
 
 import pygame 
