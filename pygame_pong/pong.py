@@ -11,7 +11,6 @@ Groovyness: 4/10
 """
 
 import pygame 
-#from pygame import *
 from pygame import mixer
 from pygame import font
 
@@ -107,14 +106,14 @@ while game_ongoing:
     
     #checks ball position at screen edges
     #right and left bound
-    if ball.rect.x >= 780:   
+    if ball.rect.x >= 770:   
         p1Score +=1
         goalSo.play()
         ball.rect.x = 400
         ball.rect.y = 200
         ball.velocity = [randint(-8, -4), randint(-8, 8)]
         
-    if ball.rect.x <= 2:        
+    if ball.rect.x <= 10:        
         p2Score +=1
         goalSo.play()
         ball.rect.x = 400
@@ -131,8 +130,10 @@ while game_ongoing:
         ball.velocity[1] = -ball.velocity[1]
     
     if pygame.sprite.collide_mask(ball, bar1) or pygame.sprite.collide_mask(ball, bar2):
-        barSo.play()
-        ball.bounce()
+        if ball.timeout < 0:
+            barSo.play()
+            ball.bounce()
+            ball.timeout=100
 
         #some acceleration to keep things interesting
         if ball.velocity[0] < 8:

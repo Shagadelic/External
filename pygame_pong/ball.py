@@ -23,11 +23,14 @@ class Ball(pygame.sprite.Sprite):
         
         self.rect = self.image.get_rect()
         self.velocity = [randint(4, 8), randint(-8, 8)]
+        
+        self.timeout=100
     
     def update(self):
         self.rect.x += self.velocity[0]
         self.rect.y += self.velocity[1]
-        
+        self.timeout-=5
     def bounce(self):
         self.velocity[0] = -self.velocity[0]
+        
        
