@@ -1,14 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Created on Mon Feb 22 19:14:17 2021
-
-@author: Shagadelic
-
-Weather: sunny
-
-Groove: 4/10
-"""
 
 import pygame 
 from pygame import mixer
