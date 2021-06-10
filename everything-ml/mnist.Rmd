@@ -1,0 +1,65 @@
+---
+title: "mnist with R"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+#mnist with two layers without a convolution
+library(keras)
+#load dataset
+mnist <- dataset_mnist()
+
+#gets training data and labels
+tr_data <- mnist$train$x
+tr_lab <- mnist$train$y
+
+#does the same for the test set
+te_data <- mnist$test$x
+te_lab <- mnist$test$y
+
+#structure
+str(tr_data)
+str(tr_lab)
+str(te_data)
+str(te_lab)
+
+#reshapes arrays
+tr_data <- tr_data %>% array_reshape(dim = c(nrow(tr_data), 28 * 28)) %>% '/'(255)
+te_data = te_data %>% array_reshape(dim = c(nrow(te_data), 28 * 28)) %>% '/'(255)
+
+#encodes labels to categorical
+tr_lab <- to_categorical(tr_lab, num_classes = 10)
+te_lab <- to_categorical(te_lab, num_classes = 10)
+
+#building the network
+network <- keras_model_sequential() %>%
+  layer_dense(units = 512, activation = "relu", input_shape = c(28 * 28)) %>%
+  layer_dense(units = 10, activation = "softmax")
+
+#some info about the model
+summary(network)
+
+#adding optimizer and loss
+#So you understand my pain: forgot the second c in "categorical_crossentropy", took me 4 hours to get to the bottom of the c..
+network %>% compile(optimizer = "rmsprop", loss = "categorical_crossentropy", metrics = c("accuracy"))
+
+
+#trains network
+network %>% fit(tr_data, tr_lab, epochs = 3, batch = 100)
+#tests accuracy on test data
+metrics <- network %>% evaluate(te_data, te_lab)
+prediction <- network %>% predict_classes(te_data[1:10,])
+print(prediction)
+#true labels
+te_lab[1:10,] %>% max.col()-1
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
