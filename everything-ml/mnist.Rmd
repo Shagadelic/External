@@ -6,9 +6,7 @@ output: html_notebook
 This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
 
 Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
-
-```{r}
-#mnist with two layers without a convolution
+```{r, setup}
 library(keras)
 #load dataset
 mnist <- dataset_mnist()
@@ -27,13 +25,16 @@ str(tr_lab)
 str(te_data)
 str(te_lab)
 
-#reshapes arrays
-tr_data <- tr_data %>% array_reshape(dim = c(nrow(tr_data), 28 * 28)) %>% '/'(255)
-te_data = te_data %>% array_reshape(dim = c(nrow(te_data), 28 * 28)) %>% '/'(255)
-
 #encodes labels to categorical
 tr_lab <- to_categorical(tr_lab, num_classes = 10)
 te_lab <- to_categorical(te_lab, num_classes = 10)
+```
+
+```{r, no convolution}
+#mnist with two layers without a convolution
+#reshapes arrays
+tr_data <- tr_data %>% array_reshape(dim = c(nrow(tr_data), 28 * 28)) %>% '/'(255)
+te_data = te_data %>% array_reshape(dim = c(nrow(te_data), 28 * 28)) %>% '/'(255)
 
 #building the network
 network <- keras_model_sequential() %>%
@@ -56,6 +57,38 @@ prediction <- network %>% predict_classes(te_data[1:10,])
 print(prediction)
 #true labels
 te_lab[1:10,] %>% max.col()-1
+```
+
+
+```{r with convolution}
+#defines network
+convNet <- keras_model_sequential() %>% 
+  layer_conv_2d(filters = 32, activation = "relu", kernel_size = c(3, 3), strides = c(1, 1), input_shape = c(28, 28, 1)) %>% 
+  layer_max_pooling_2d(pool_size = c(2, 2), strides = 2) %>% 
+  layer_conv_2d(filters = 64, activation = "relu", kernel_size = c(3, 3), strides = c(1, 1), padding = "same", input_shape = c(13, 13, 32)) %>%
+  layer_max_pooling_2d(pool_size = c(2, 2), strides = 2) %>% 
+  layer_conv_2d(filters = 128, activation = "relu", kernel_size = c(3, 3), strides = c(1, 1), padding = "same", input_shape = c(6, 6, 64)) %>% 
+  layer_max_pooling_2d(pool_size = c(2, 2), strides = 2) %>% 
+  layer_flatten() %>% 
+  layer_dense(units = 128, activation = "relu") %>% 
+  layer_dense(units = 10, activation = "softmax")
+
+#model info
+convNet
+
+#data preprocessing
+tr_data <- array_reshape(tr_data, c(nrow(tr_data), 28, 28, 1)) %>% '/'(255)
+te_data <-  array_reshape(te_data, c(nrow(te_data), 28, 28, 1)) %>% '/'(255)
+
+#compile
+convNet %>% compile(optimizer = "rmsprop", loss = "categorical_crossentropy", metrics = c("accuracy"))
+
+#train 
+convNet %>% fit(tr_data, tr_lab, epochs = 3, batch = 100)
+
+#test accuracy on test set
+metric <- convNet %>% evaluate(te_data, te_lab)
+metric
 ```
 
 Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
