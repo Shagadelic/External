@@ -1,0 +1,164 @@
+---
+title: "R Classification with mlr"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r, kNN Algorithm}
+library(tidyverse)
+library(mlr)
+library(ggplot2)
+library(GGally)
+
+#loads the diabetes dataset from mclust as a tibble
+dTib <- as_tibble(diabetes)
+summary(dTib)
+
+#data overview
+ggpairs(dTib[,2:4])
+
+#building the task of the model in mlr
+diabTsk <- makeClassifTask(data = dTib, target = "class")
+diabTsk
+
+#available classification algorithms
+listLearners("classif")$class
+
+#learner
+knn <- makeLearner("classif.knn", par.vals = list("k"=2))
+
+#model
+knnModel <- train(learner = knn, task = diabTsk)
+
+#prediction
+knnPred <- predict(knnModel, newdata = dTib)
+knnPred
+
+#performance metrics
+perf <- performance(knnPred, measures = list(mmce, acc))
+perf
+
+#holdout cross validation method: simple split into training and test data
+holdout <- makeResampleDesc(method = "Holdout", split = 2/3, stratify = TRUE)
+holdoutCV <- resample(learner = knn, task = diabTsk, resampling = holdout, measures = list(mmce, acc))
+
+#second resampler using 10% of data, without stratify:keeps class split off similar 
+ho2 <- makeResampleDesc(method = "Holdout", split = 1/10)
+hoCV2 <- resample(learner = knn, task = diabTsk, resampling = holdout, measures = list(mmce, acc))
+
+#confusion matrix, to better see which classes are missclassified
+confMat <- calculateConfusionMatrix(holdoutCV$pred, relative = TRUE)
+confMat
+
+#kFold crossvalidation, data split into several parts where 1 of them is the test set in each run
+kFold <- makeResampleDesc(method = "RepCV", fold = 10, reps = 50, stratify = TRUE)
+kFoldCV <- resample(learner = knn, task = diabTsk, resampling = kFold, measures = list(mmce, acc))
+
+#extra resamplers
+for (i in 1:5){
+  cv_3x5 <- makeResampleDesc(method = "RepCV", fold = 3, reps = 5, stratify = TRUE)
+  kFoldCV_3x5 <- resample(learner = knn, task = diabTsk, resampling = cv_3x5, 
+                          measures = list(mmce, acc), show.info = FALSE)
+  print(paste0(i,"  fold=3, reps=5    ", kFoldCV_3x5$measures.test[15, ][3]))
+}
+for (i in 1:5){
+  cv_3x500 <- makeResampleDesc(method = "RepCV", fold = 3, reps = 500, stratify = TRUE)
+  kFoldCV_3x500 <- resample(learner = knn, task = diabTsk, resampling = cv_3x5,
+                            measures = list(mmce, acc), show.info = FALSE)
+  print(paste0(i,"  fold=3, reps=500  ", kFoldCV_3x500$measures.test[15, ][3]))
+}
+
+#confusion matrix kFold
+calculateConfusionMatrix(kFoldCV$pred, relative = TRUE)
+
+#leave one out CV
+loo <- makeResampleDesc(method = "LOO")
+looCV <- resample(learner = knn, task = diabTsk, resampling = loo, measures = list(mmce, acc))
+
+looConfMat <- calculateConfusionMatrix(looCV$pred, relative = TRUE)
+looConfMat
+
+################################################################################
+
+#hyperparametertuning for knn
+#values to test
+knnParamSpace <- makeParamSet(makeDiscreteParam("k", values = 1:10))
+#search method
+gridSearch <- makeTuneControlGrid()
+#resampler
+tuningCV <- makeResampleDesc(method = "RepCV", fold = 10, reps = 20, stratify = TRUE)
+#tuning
+tunedK <- tuneParams(learner = "classif.knn",task = diabTsk, 
+                     resampling = tuningCV, par.set = knnParamSpace, 
+                     control = gridSearch)
+#tuning visualization
+tuningData <- generateHyperParsEffectData(tunedK)
+
+plotHyperParsEffect(tuningData, x = "k", y = "mmce.test.mean", plot.type = "line") +
+  theme_linedraw() +
+  labs(x = "k", y = "Mean missclassification error", 
+       title = "Hyperparameter tuning of k for kNN-classification on diabetes data from mclust") +
+  scale_x_continuous(limits = c(1, 10), breaks = seq(1, 10, 1))
+#model with tuned k
+tunedKnn <- setHyperPars(makeLearner("classif.knn"), par.vals = tunedK$x)
+tunedKnnModel <- train(learner = tunedKnn, task = diabTsk)
+
+
+
+
+#hyperparameter tuning in cross validation
+#defines inner and outer samplers for the CV loops
+inner <- makeResampleDesc("CV")
+outer <- makeResampleDesc("RepCV", fold = 10, rep = 5)
+knnWrapper <- makeTuneWrapper(learner = "classif.knn", resampling = inner, 
+                              measures = list(mmce, acc), par.set = knnParamSpace, 
+                              control = gridSearch)
+cvWithTuning <- resample(learner = knnWrapper, task = diabTsk, resampling = outer)
+cvWithTuning
+
+################################################################################
+
+#kNN calssification with the iris dataset
+irisTib <- as.tibble(iris)
+ggpairs(irisTib[, 1:4])
+#iris taks
+irisTsk <- makeClassifTask(data = iris, target = "Species")
+
+#observed values for k and search scheme
+irisParamSet <- makeParamSet(makeDiscreteParam("k", values = 1:20))
+gridSearch <- makeTuneControlGrid()
+#resampler description
+tuningCV <- makeResampleDesc(method = "RepCV", folds = 10, reps = 20)
+tunedK <- tuneParams(learner = "classif.knn", task = irisTsk, 
+                     resampling = tuningCV, par.set = irisParamSet,
+                     control = gridSearch)
+#tuning visualization
+tuningData <- generateHyperParsEffectData(tunedK)
+tuningData
+plotHyperParsEffect(tuningData, x = "k", y = "mmce.test.mean", plot.type = "line") +
+  theme_linedraw() +
+  labs(x = "k", y = "Mean missclassification error", 
+       title = "Hyperparameter tuning of k for kNN-classification on the iris dataset") +
+  scale_x_continuous(limits = c(1, 20), breaks = seq(1, 20, 1))
+tunedIrisKnn <- setHyperPars(makeLearner("classif.knn"), par.vals = tunedK$x)
+tunedIrisModel <- train(tunedKnn, task = irisTsk)
+
+#inner and outer loops of CV
+inner <-  makeResampleDesc("CV")
+outer <-  makeResampleDesc(method = "Holdout", split = 2/3, stratify = TRUE)
+#wrapper and model
+knnWrapper <- makeTuneWrapper(learner = "classif.knn", resampling = inner, 
+                              measures = list(mmce, acc), par.set = irisParamSet,
+                              control = gridSearch)
+irisTunedCV <- resample(learner = knnWrapper, task = irisTsk, resampling = outer)
+irisTunedCV
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
