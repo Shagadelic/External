@@ -1,0 +1,99 @@
+---
+title: "Binary classifiacation of imdb reviews with keras in R"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+library(keras)
+library(tidyverse)
+
+#loads the imdb dataset where reviews contain words numbered by their requency
+#each review has a 1 or 0 as the label,
+#depending on whether the review is a positive or negative one.
+#sets the top word count to keep in the training data, which is low here due to
+#memory limitations
+keep_words = 4000
+imdb <- dataset_imdb(num_words=keep_words)
+
+#multivalue assignment with %<-%
+c(c(train_dat, train_lab), c(test_dat, test_lab)) %<-% imdb
+#A function that takes data from the training or test set and returns the words
+#contained in it.
+decode_review <- function(data){
+  #loads word index and inverts it for future lookup
+  word_index <- dataset_imdb_word_index()
+  reverse_word_index <- setNames(names(word_index), word_index)
+  #looks up word at index in data vector, 
+  #skips first 3 due to set words for indices
+  dec <- sapply(data, function(index){
+    word <- if (index >= 3) reverse_word_index[[as.character(index - 3)]]
+    if (!is.null(word)) word else "?"
+  })
+  return(dec)
+}
+#decode_review(test_dat[[1]])
+
+#converting inputs for the network
+#one hot encodes reviews
+vectorize_seqs <- function(seq=NULL, dimension=keep_words){
+  #matrix of zeroes, with shape sample X keep_words (most common words)
+  results <- matrix(0, nrow=length(seq), ncol=dimension)
+  #sets rows of matrix to 1 where words(out of keep_words) are in seq 
+  for(i in 1:length(seq)){
+    results[i, seq[[i]]] <- 1
+  }
+  return(results)
+}
+
+x_train <- vectorize_seqs(train_dat)
+x_test <- vectorize_seqs(test_dat)
+#converts labels from int to numeric
+y_train <- as.numeric(train_lab)
+y_test <- as.numeric(test_lab)
+
+model <- keras_model_sequential() %>% 
+  layer_dense(units = 16, activation = "relu", input_shape = c(keep_words)) %>% 
+  layer_dense(units = 16, activation = "relu") %>% 
+  layer_dense(units = 1, activation = "sigmoid")
+
+model %>% compile(
+  optimizer = "rmsprop",
+  loss = "binary_crossentropy",
+  metrics = c("accuracy"))
+
+#validation set creation
+validation_ids <- 1:10000
+#splitting up training data
+x_val <- x_train[validation_ids, ]
+part_x_train <- x_train[-validation_ids, ]
+#splitting up testing data
+y_val <- y_train[validation_ids]
+part_y_train <- y_train[-validation_ids]
+
+#training
+hist <- model %>% fit(part_x_train,
+                      part_y_train,
+                      epochs = 4,
+                      batch_size = 512,
+                      validation_data = list(x_val,
+                                             y_val)
+                      )
+str(hist)
+plot(hist)
+
+#evaluation on test data
+result <- model %>% evaluate(x_test, y_test)
+result
+#prediction
+model %>% predict(x_test[1:10,])
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
