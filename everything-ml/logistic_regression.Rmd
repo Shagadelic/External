@@ -1,0 +1,65 @@
+---
+title: "Logistic regression on a dataset from titanic with R and keras"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+library(mlr)
+library(tidyverse)
+library(viridis)
+#titanic survivour data
+data(titanic_train, package = "titanic")
+titanicTib <- as.tibble(titanic_train) 
+titanicTib
+summary(titanicTib)
+
+#Data preprocessing
+titanicCleaned <- titanicTib %>% 
+  mutate_at(.vars = c("Sex", "Survived", "Pclass"), .funs = factor) %>% 
+  mutate(FamilyMembers = SibSp + Parch) %>% 
+  select(Survived, Pclass, Sex, Age, FamilyMembers, Fare)
+
+titanicCleaned
+
+#selects columns
+titanicLong <- titanicCleaned %>%
+  pivot_longer(- Survived, names_to = "vars", values_to = "vals", values_transform = list(vals = as.character))
+
+titanicLong
+
+#plots
+titanicLong %>% 
+  filter(vars != "Sex" & vars != "Pclass") %>% 
+  ggplot(aes(Survived, as.numeric(vals), fill = Survived)) +
+  geom_violin(draw_quantiles = c(0.25, 0.5, 0.75), color = "black") +
+  facet_wrap(~vars, scales = "free_y") +
+  labs(title = "Survival on the titanic", 
+       subtitle = "Distributions of Age, Family size and Fare price 
+       among the two groups of titanic passengers" ) +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
+  
+
+titanicLong %>% 
+  filter(vars == "Sex" | vars == "Pclass") %>% 
+  ggplot(aes(vals, fill = Survived)) +
+  geom_bar(position = "fill") +
+  facet_wrap(~vars, scales = "free_x") +
+  labs(title = "Survival on the titanic", 
+       subtitle = "Ratio of survivours depending on factors Sex and Passenger class") +
+  viridis::scale_fill_viridis(discrete = TRUE, option = "cividis") +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
+
+
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
