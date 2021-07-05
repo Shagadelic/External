@@ -1,5 +1,5 @@
 ---
-title: "Logistic regression on a dataset from titanic with R and keras"
+title: "Logistic regression on a dataset from titanic with mlr"
 output: html_notebook
 ---
 
@@ -20,7 +20,7 @@ summary(titanicTib)
 #Data preprocessing
 titanicCleaned <- titanicTib %>% 
   mutate_at(.vars = c("Sex", "Survived", "Pclass"), .funs = factor) %>% 
-  mutate(FamilyMembers = SibSp + Parch) %>% 
+  mutate(FamilyMembers = SibSp + Parch) %>%
   select(Survived, Pclass, Sex, Age, FamilyMembers, Fare)
 
 titanicCleaned
@@ -55,7 +55,54 @@ titanicLong %>%
   theme(plot.title = element_text(hjust = 0.5),
         plot.subtitle = element_text(hjust = 0.5))
 
+#checking columnwise for missing values
+apply(titanicCleaned, 2, is.na) %>% apply( 2, sum) 
+#dealing with missing values, by taking the average value for age as many samples
+#are affected
+imputedAge <- titanicCleaned %>%  impute(cols = list(Age = imputeMean()))
+imputedAge$data
+#setting up the model
+titTask <- makeClassifTask(data = imputedAge$data, target = "Survived")
+logReg <- makeLearner(cl = "classif.logreg", predict.type = "prob")
+lrModel <- train(logReg, titTask)
 
+#setting up cross validation
+logRegWrap <- makeImputeWrapper(learner = "classif.logreg", 
+                                cols = list(Age = imputeMean()))
+kFold <- makeResampleDesc(method = "RepCV", fold = 10, reps = 30, stratify = TRUE)
+logRegwithImpute <- resample(learner = logRegWrap, task = titTask, 
+                             resampling = kFold, measures = list(acc, fpr, fnr))
+logRegwithImpute
+
+#getting parameters from the model
+lrParams <- getLearnerModel(lrModel)
+coef(lrParams)
+#converting log odds to odd ratios=e^(log_odds)
+exp(cbind(Odds_Ratio = coef(lrParams), confint(lrParams)))
+
+#predicting on a test set
+data(titanic_test, package = "titanic")
+testTib <- as_tibble(titanic_test)
+testTib
+
+#preparing the test data
+preparedTest <- testTib %>% 
+  mutate_at(.vars = c("Sex", "Pclass"), .funs = factor) %>% 
+  mutate(FamilyMembers = SibSp + Parch) %>% 
+  select(Pclass, Sex, Age, FamilyMembers, Fare)
+preparedTest
+
+#checking columnwise for missing values
+apply(preparedTest, 2, is.na) %>% apply( 2, sum) 
+#dealing with missing values, 
+#by taking the average value for age as many samples are affected
+imputedAgeTest <- preparedTest %>%  
+  impute(cols = list(Age = imputeMean()))
+imputedAgeTest$data
+
+#model output
+res <- predict(lrModel, newdata = imputedAgeTest$data)
+res$data
 ```
 
 Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
